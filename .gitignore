@@ -1,0 +1,8 @@
+compile_commands.json
+objects/*
+ft_ping
+.cache
+inetutils
+real_ping
+.vscode
+ft_traceroute
