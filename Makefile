@@ -18,10 +18,10 @@ RM		:=	rm -rf
 all:		obj $(NAME)
 
 $(OBJ_DIR)/%.o:	$(SRC_DIR)/%.c
-			$(CC) $(CFLAGS) -c $< -o $@ $(LFLAGS)/$(INCS)
+			$(CC) $(CFLAGS) -g -c $< -o $@ $(LFLAGS)/$(INCS)
 
 $(NAME):	$(OBJS)
-			$(CC) -lm -o $(NAME) $(OBJS)
+			$(CC) -g -o $(NAME) $(OBJS)
 
 obj:
 			@mkdir -p $(OBJ_DIR)

@@ -1,14 +1,25 @@
 #include "ft_traceroute.h"
 
-int main(void) {
-	trace_t t;
+int clear(trace_t *t, int i) {
+	freeaddrinfo(t->result);
+	close(t->fd);
 
+	return i;
+}
+
+int main(void) {
+	trace_t t  = { 0 };
 	t.hostname = "google.com";
 
-	setup_socket(&t);
+	if (setup_socket(&t)) {
+		fprintf(stderr, "error creating socket\n");
+		return clear(&t, 1);
+	}
 
-	printf("Got socket\n");
+	if (run_loop(&t)) {
+		fprintf(stderr, "error running loop\n");
+		return clear(&t, 1);
+	}
 
-	close(t.fd);
-	return 0;
+	return clear(&t, 0);
 }

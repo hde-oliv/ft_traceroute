@@ -1,19 +1,40 @@
+#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "ft_traceroute.h"
 
-#define M_HOPS 30
-#define P_SIZE 64
+static void configure_socket(trace_t *t, int ttl) { setsockopt(t->fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)); }
 
-void run_loop(trace_t *t) {
-	struct timeval start, end;
+int run_loop(trace_t *t) {
+	struct timeval start, end = { 0 };
 	char		   packet[P_SIZE];
-	char		   response[P_SIZE + 20];
+	char		   response[M_SIZE];
 
 	int flag = 1;
+
+	print_init(t);
 	for (int i = 1; (flag != 0) && (i <= M_HOPS); i++) {
-		setup_packet();
-		send_packet();
-		read_packet();
-		validate_packet();
-		print_response();
+		configure_socket(t, i);
+
+		int		c	  = 0;
+		batch_t batch = { 0 };
+
+		while (c != 3) {
+			setup_packet(&packet, P_SIZE, i);
+
+			if (send_packet(t, &start, &packet, P_SIZE)) return 1;
+
+			if (read_packet(t, &end, &response, M_SIZE)) return 1;
+
+			store_packet(&response, &batch, c, &start, &end);
+
+			c++;
+		}
+
+		print_response(i, &batch);
 	}
+
+	return 0;
 }

@@ -1,3 +1,5 @@
+#include <netinet/ip.h>
+
 #include "ft_traceroute.h"
 
 unsigned short get_cksum(unsigned short *b, int len) {
@@ -15,25 +17,25 @@ unsigned short get_cksum(unsigned short *b, int len) {
 	return ~sum;
 }
 
-void fill_packet(char *p, int p_size) {
+void fill_packet(void *p, int p_size) {
 	struct timeval ts;
 
 	gettimeofday(&ts, NULL);
 
 	memcpy(p, &ts.tv_sec, 8);
 	p += 8;
-	memcpy(p, &ts.tv_nsec, 8);
+	memcpy(p, &ts.tv_usec, 8);
 	p += 8;
 
 	p_size = p_size - 8 - 8 - 8;
 
 	for (int i = 0; i < p_size; i++) {
-		*p++ = i;
+		*(char *)p++ = i;
 	}
 }
 
 void setup_packet(void *p, size_t p_siz, short seq) {
-	icmp_header_t *h = (icmp_header_t *)p;
+	icmp_t *h = (icmp_t *)p;
 
 	h->type	 = ICMP_ECHO;
 	h->code	 = 0;
@@ -46,61 +48,79 @@ void setup_packet(void *p, size_t p_siz, short seq) {
 	h->cksum = get_cksum((unsigned short *)p, p_siz);
 }
 
-void validate_packet(void *s, void *r, short p_siz) {
-	// NOTE: +20 Because of ipv4 header
-	struct icmp *rp = (struct icmp *)(r + 20);
-	struct icmp *sp = (struct icmp *)s;
+int validate_packet(void *s, void *r, short p_siz) {
+	icmp_t *rp = (r + 20);
+	icmp_t *sp = s;
 
+	(void)rp;
+	(void)sp;
+	(void)p_siz;
 	int err = 0;
 
-	if (rp->icmp_type != ICMP_ECHOREPLY) {
-		fprintf(stderr, "invalid type %hu\n", rp->icmp_type);
-		err = 1;
-	}
-	if (rp->icmp_code != 0) {
-		fprintf(stderr, "invalid code\n");
-		err = 1;
-	}
-	if (rp->icmp_id != sp->icmp_id) {
-		fprintf(stderr, "invalid id\n");
-		err = 1;
-	}
-	if (rp->icmp_seq != sp->icmp_seq) {
-		fprintf(stderr, "invalid seq\n");
-		err = 1;
-	}
-	if (rp->icmp_code != get_cksum((unsigned short *)rp, p_siz)) {
-		fprintf(stderr, "invalid cksum\n");
-		err = 1;
-	}
+	/* if (rp->type != ICMP_ECHOREPLY && rp->type != ICMP_TIME_EXCEEDED) { */
+	/* 	fprintf(stderr, "validate: invalid type %hu\n", rp->type); */
+	/* 	err = 1; */
+	/* } */
+	/* if (rp->code != 0) { */
+	/* 	fprintf(stderr, "validate: invalid code\n"); */
+	/* 	err = 1; */
+	/* } */
+	/* if (rp->id != sp->id) { */
+	/* 	fprintf(stderr, "validate: invalid id %hu | %hu\n", rp->id, sp->id); */
+	/* 	err = 1; */
+	/* } */
+	/* if (rp->seq != sp->seq) { */
+	/* 	fprintf(stderr, "validate: invalid seq\n"); */
+	/* 	err = 1; */
+	/* } */
+	/* if (rp->code != get_cksum((unsigned short *)rp, p_siz)) { */
+	/* 	fprintf(stderr, "validate: invalid cksum\n"); */
+	/* 	err = 1; */
+	/* } */
 
-	if (err) {
-		errno = EBADMSG;
-		panic("validate_packet");
-	}
+	return err;
 }
 
-void send_packet(void *time, void *packet, int p_siz) {
-	ssize_t err;
+int send_packet(trace_t *t, void *time, void *packet, int p_siz) {
+	struct timeval *ts = time;
+	gettimeofday(ts, NULL);
 
-	err = clock_gettime(CLOCK_REALTIME, (struct timespec *)time);
-	if (err == -1) panic("clock_gettime");
+	int err;
+	err = sendto(t->fd, packet, p_siz, 0, t->rp->ai_addr, t->rp->ai_addrlen);
+	if (err < 0) {
+		fprintf(stderr, "sendto: %s", strerror(errno));
+		return 1;
+	}
 
-	err = sendto(loop.sockfd, packet, p_siz, 0, loop.rp->ai_addr, loop.rp->ai_addrlen);
-	if (err < 0) panic("sendto");
-
-	loop.stats.send++;
+	return 0;
 }
 
-void read_packet(void *time, void *packet, int p_siz) {
-	ssize_t err;
+int read_packet(trace_t *t, void *time, void *packet, int p_siz) {
+	struct timeval *ts = time;
+	gettimeofday(ts, NULL);
 
-	err = recvfrom(loop.sockfd, packet, p_siz, 0, loop.rp->ai_addr, &loop.rp->ai_addrlen);
-	if (err < 0) panic("recvfrom");
+	int err;
+	err = recvfrom(t->fd, packet, p_siz, 0, NULL, NULL);
+	if (err < 0) {
+		fprintf(stderr, "recvfrom: %s", strerror(errno));
+		return 1;
+	}
 
-	err = clock_gettime(CLOCK_REALTIME, (struct timespec *)time);
+	return 0;
+}
 
-	if (err == -1) panic("clock_gettime");
+void store_packet(void *p, batch_t *b, int i, void *s, void *e) {
+	sum_t		 *sum  = &b->sum[i];
+	struct iphdr *ip   = p;
+	icmp_t		 *icmp = p + 20;
 
-	loop.stats.recv++;
+	sum->ip	  = ip->saddr;
+	sum->type = icmp->type;
+
+	struct timeval *start = s;
+	struct timeval *end	  = e;
+
+	double sts = ((start->tv_sec * 1000) + (start->tv_usec / 1000.0));
+	double ets = ((end->tv_sec * 1000) + (end->tv_usec / 1000.0));
+	sum->time  = ets - sts;
 }

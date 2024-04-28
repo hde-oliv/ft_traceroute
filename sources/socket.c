@@ -1,6 +1,8 @@
+#include <string.h>
+
 #include "ft_traceroute.h"
 
-void setup_socket(trace_t *t) {
+int setup_socket(trace_t *t) {
 	int err;
 
 	struct addrinfo	 hints;
@@ -15,7 +17,7 @@ void setup_socket(trace_t *t) {
 	err = getaddrinfo(t->hostname, NULL, &hints, &result);
 	if (err) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
-		exit(1);
+		return 1;
 	}
 
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
@@ -26,8 +28,8 @@ void setup_socket(trace_t *t) {
 			t->fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
 			if (t->fd == -1) {
-				perror("socket");
-				exit(1);
+				fprintf(stderr, "socket: %s\n", strerror(errno));
+				return 1;
 			}
 			break;
 		}
@@ -35,6 +37,11 @@ void setup_socket(trace_t *t) {
 
 	if (rp == NULL) {
 		fprintf(stderr, "could not connect with any address\n");
-		exit(1);
+		return 1;
 	}
+
+	t->result = result;
+	t->rp	  = rp;
+
+	return 0;
 }
