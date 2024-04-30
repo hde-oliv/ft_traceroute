@@ -1,7 +1,7 @@
 #include "ft_traceroute.h"
 
 void print_response(int i, batch_t *b) {
-	printf(GREEN " %d " RESET, i);
+	printf(YELLOW " %d " RESET, i);
 
 	char ipstr[16];
 	char last[16];
@@ -16,7 +16,7 @@ void print_response(int i, batch_t *b) {
 
 		snprintf(ipstr, 16, "%d.%d.%d.%d", a, b, c, d);
 
-		if (ft_strncmp(ipstr, last, 16)) printf(RED " %s  " RESET, ipstr);
+		if (ft_strncmp(ipstr, last, 16)) printf(CYAN " %s  " RESET, ipstr);
 		printf(GREEN "%.3lf" RESET " ms  ", t->time);
 
 		snprintf(last, 16, "%d.%d.%d.%d", a, b, c, d);
