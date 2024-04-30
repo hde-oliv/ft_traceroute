@@ -93,3 +93,4 @@ void panic(char *s);
 void print_response(int i, batch_t *b);
 void print_init(trace_t *t);
 void print_bytes(int size, void *ptr);
+int	 ft_strncmp(const char *s1, const char *s2, size_t n);
