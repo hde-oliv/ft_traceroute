@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <asm-generic/errno.h>
+#include <asm-generic/socket.h>
 #include <bits/time.h>
 #include <errno.h>
 #include <math.h>
@@ -42,7 +43,7 @@ typedef struct s_trace {
 } trace_t;
 
 typedef struct s_sum {
-	unsigned int  ip;
+	char		  ip[INET6_ADDRSTRLEN];
 	double		  time;
 	unsigned char type;
 } sum_t;
@@ -74,17 +75,16 @@ typedef struct s_ip {
 } ip_t;
 
 // Socket
-int setup_socket(trace_t *t);
+int	 setup_socket(trace_t *t);
+void configure_socket(trace_t *t, int ttl);
 
 // Loop
 int run_loop(trace_t *t);
 
 // Packet
 void setup_packet(void *p, size_t p_siz, short seq);
-int	 send_packet(trace_t *t, void *time, void *packet, int p_siz);
-int	 read_packet(trace_t *t, void *time, void *packet, int p_siz);
 int	 validate_packet(void *s, void *r, short p_siz);
-void store_packet(void *p, batch_t *b, int i, void *s, void *e);
+void store_packet(void *p, batch_t *b, char *ip, int i, void *s, void *e);
 
 // Panic
 void panic(char *s);

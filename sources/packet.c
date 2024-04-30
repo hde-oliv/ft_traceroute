@@ -1,4 +1,5 @@
-#include <netinet/ip.h>
+#include <netinet/in.h>
+#include <stdio.h>
 
 #include "ft_traceroute.h"
 
@@ -81,46 +82,18 @@ int validate_packet(void *s, void *r, short p_siz) {
 	return err;
 }
 
-int send_packet(trace_t *t, void *time, void *packet, int p_siz) {
-	struct timeval *ts = time;
-	gettimeofday(ts, NULL);
+void store_packet(void *p, batch_t *b, char *ip, int i, void *s, void *e) {
+	sum_t  *sum	 = &b->sum[i];
+	icmp_t *icmp = p + 20;
 
-	int err;
-	err = sendto(t->fd, packet, p_siz, 0, t->rp->ai_addr, t->rp->ai_addrlen);
-	if (err < 0) {
-		fprintf(stderr, "sendto: %s", strerror(errno));
-		return 1;
-	}
-
-	return 0;
-}
-
-int read_packet(trace_t *t, void *time, void *packet, int p_siz) {
-	struct timeval *ts = time;
-	gettimeofday(ts, NULL);
-
-	int err;
-	err = recvfrom(t->fd, packet, p_siz, 0, NULL, NULL);
-	if (err < 0) {
-		fprintf(stderr, "recvfrom: %s", strerror(errno));
-		return 1;
-	}
-
-	return 0;
-}
-
-void store_packet(void *p, batch_t *b, int i, void *s, void *e) {
-	sum_t		 *sum  = &b->sum[i];
-	struct iphdr *ip   = p;
-	icmp_t		 *icmp = p + 20;
-
-	sum->ip	  = ip->saddr;
 	sum->type = icmp->type;
 
 	struct timeval *start = s;
 	struct timeval *end	  = e;
 
-	double sts = ((start->tv_sec * 1000) + (start->tv_usec / 1000.0));
-	double ets = ((end->tv_sec * 1000) + (end->tv_usec / 1000.0));
-	sum->time  = ets - sts;
+	double time = (double)(end->tv_sec - start->tv_sec) * 1000 + (double)(end->tv_usec - start->tv_usec) / 1000;
+
+	sum->time = time;
+
+	snprintf(sum->ip, INET6_ADDRSTRLEN, "%s", ip);
 }

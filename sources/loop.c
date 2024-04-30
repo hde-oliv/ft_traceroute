@@ -1,20 +1,7 @@
+#include <netinet/in.h>
+#include <stdio.h>
+
 #include "ft_traceroute.h"
-
-static void configure_socket(trace_t *t, int ttl) { setsockopt(t->fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)); }
-
-static void check_batch(batch_t *t, char *hostip, int *flag) {
-	char		 ipstr[16];
-	unsigned int ip = t->sum[0].ip;
-
-	int a = (ip) & 0x000000FF;
-	int b = (ip >> 8) & 0x000000FF;
-	int c = (ip >> 16) & 0x000000FF;
-	int d = (ip >> 24);
-
-	snprintf(ipstr, 16, "%d.%d.%d.%d", a, b, c, d);
-
-	if (!ft_strncmp(hostip, ipstr, 16)) *flag = 0;
-}
 
 int run_loop(trace_t *t) {
 	struct timeval start, end = { 0 };
@@ -22,6 +9,7 @@ int run_loop(trace_t *t) {
 	char		   response[M_SIZE];
 
 	int flag = 1;
+	int err;
 
 	print_init(t);
 	for (int i = 1; (flag != 0) && (i <= M_HOPS); i++) {
@@ -30,20 +18,37 @@ int run_loop(trace_t *t) {
 		int		c	  = 0;
 		batch_t batch = { 0 };
 
+		struct sockaddr_in res_addr;
+		unsigned int	   res_len = sizeof(res_addr);
+		char			   res_ip[INET6_ADDRSTRLEN];
+
 		while (c != 3) {
 			setup_packet(&packet, P_SIZE, i);
 
-			if (send_packet(t, &start, &packet, P_SIZE)) return 1;
+			gettimeofday(&start, NULL);
+			err = sendto(t->fd, packet, P_SIZE, 0, t->rp->ai_addr, t->rp->ai_addrlen);
 
-			if (read_packet(t, &end, &response, M_SIZE)) return 1;
+			if (err < 0) {
+				fprintf(stderr, "sendto: %s", strerror(errno));
+				return 1;
+			}
 
-			store_packet(&response, &batch, c, &start, &end);
+			err = recvfrom(t->fd, response, M_SIZE, 0, (struct sockaddr *)&res_addr, &res_len);
+
+			gettimeofday(&end, NULL);
+			if (err < 0) {
+				snprintf(res_ip, 2, "*");
+			}
+
+			inet_ntop(res_addr.sin_family, &res_addr.sin_addr, res_ip, sizeof(res_addr));
+
+			store_packet(&response, &batch, res_ip, c, &start, &end);
 
 			c++;
 		}
 
 		print_response(i, &batch);
-		check_batch(&batch, t->ip_str, &flag);
+		if (!ft_strncmp(t->ip_str, batch.sum[0].ip, 16)) flag = 0;
 	}
 
 	return 0;

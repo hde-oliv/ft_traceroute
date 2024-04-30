@@ -1,6 +1,11 @@
-#include <string.h>
-
 #include "ft_traceroute.h"
+
+void configure_socket(trace_t *t, int ttl) {
+	struct timeval tv = { 1, 0 };
+
+	setsockopt(t->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	setsockopt(t->fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl));
+}
 
 int setup_socket(trace_t *t) {
 	int err;

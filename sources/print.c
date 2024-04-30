@@ -1,25 +1,26 @@
+#include <netinet/in.h>
+#include <stdio.h>
+
 #include "ft_traceroute.h"
 
 void print_response(int i, batch_t *b) {
 	printf(YELLOW " %d " RESET, i);
 
-	char ipstr[16];
-	char last[16];
+	char ipstr[INET6_ADDRSTRLEN];
+	char last[INET6_ADDRSTRLEN];
 
 	for (int idx = 0; idx < 3; idx++) {
 		sum_t *t = &b->sum[idx];
 
-		int d = (t->ip >> 24);
-		int c = (t->ip >> 16) & 0x000000FF;
-		int b = (t->ip >> 8) & 0x000000FF;
-		int a = (t->ip) & 0x000000FF;
+		snprintf(ipstr, INET6_ADDRSTRLEN, "%s", t->ip);
 
-		snprintf(ipstr, 16, "%d.%d.%d.%d", a, b, c, d);
+		if (ft_strncmp(ipstr, last, 16)) {
+			printf(" %s  ", ipstr);
+		}
 
-		if (ft_strncmp(ipstr, last, 16)) printf(CYAN " %s  " RESET, ipstr);
-		printf(GREEN "%.3lf" RESET " ms  ", t->time);
+		printf(GREEN "%.3f" RESET " ms  ", t->time);
 
-		snprintf(last, 16, "%d.%d.%d.%d", a, b, c, d);
+		snprintf(last, INET6_ADDRSTRLEN, "%s", ipstr);
 	}
 	printf("\n");
 }
